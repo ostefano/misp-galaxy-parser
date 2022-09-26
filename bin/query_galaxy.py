@@ -4,27 +4,12 @@ import argparse
 import os
 import sys
 
+import galaxy_parser
 from galaxy_parser import galaxy
-from galaxy_parser import discerner
 from galaxy_parser import exceptions
-
-from typing import List
 
 
 TMP_DIR = "/tmp/"
-
-
-def get_discerners(
-    galaxy_manager: galaxy.BaseGalaxyManagerSubType,
-    galaxy_names: List[str],
-    source: str = None
-) -> List[discerner.BaseDiscernerSubType]:
-    """Return a list of dynamically created discerners."""
-    discerners = []
-    for galaxy_name in galaxy_names:
-        new_type = discerner.BaseDiscerner.create_class(galaxy_name, source or "custom")
-        discerners.append(new_type(galaxy_manager))
-    return discerners
 
 
 def main():
@@ -33,7 +18,6 @@ def main():
         "-q",
         "--query",
         dest="query",
-        type=str,
         required=True,
         help="query",
     )
@@ -52,6 +36,14 @@ def main():
         default=False,
         action="store_true",
         help="whether to force download",
+    )
+    parser.add_argument(
+        "-m",
+        "--compound",
+        dest="compound",
+        default=False,
+        action="store_true",
+        help="whether the queried is for a compound label",
     )
     parser.add_argument(
         "-v",
@@ -76,13 +68,13 @@ def main():
         verbose=True,
         force=args.force_download,
     )
-    discerners = get_discerners(galaxy_manager, args.galaxy_list)
+    discerners = galaxy_parser.get_discerners(galaxy_manager)
 
     # Process
     labels = []
     for d in discerners:
         try:
-            discernment = d.discern(args.query)
+            discernment = d.discern(args.query, args.compound)
             labels.append(discernment.get_tag())
         except exceptions.FailedDiscernment:
             pass

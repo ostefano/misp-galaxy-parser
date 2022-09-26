@@ -13,9 +13,8 @@ isolated_build = True
 
 [testenv]
 commands=nose2
-extras=misp
 deps=
-    mock
+    nose2
 """
 
 [tool.black]

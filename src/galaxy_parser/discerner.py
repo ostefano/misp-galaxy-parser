@@ -7,6 +7,7 @@ from typing import Tuple
 from typing import List
 from typing import Type
 from typing import TypeVar
+from typing import Optional
 
 from galaxy_parser import galaxy
 from galaxy_parser import exceptions
@@ -90,27 +91,33 @@ class AbstractDiscerner(abc.ABC):
 class BaseDiscerner(AbstractDiscerner, abc.ABC):
     """Base class for standard discerners."""
 
-    GALAXY_CLUSTER = None
+    GALAXY_NAME = None
 
     SOURCE_NAME = None
 
     @classmethod
-    def create_class(cls, cluster: str, source: str) -> Type[galaxy.BaseGalaxyManagerSubType]:
+    def create_class(
+        cls,
+        cluster: str,
+        source: Optional[str] = None,
+    ) -> Type[galaxy.BaseGalaxyManagerSubType]:
         """Dynamically create a new type given a cluster name."""
+        if not source:
+            source = "custom"
         class_name = f"DiscernerClass_{cluster}_{source}"
         return cast(
             Type[galaxy.BaseGalaxyManagerSubType],
-            type(class_name, (cls,), {'GALAXY_CLUSTER': cluster, 'SOURCE_NAME': source})
+            type(class_name, (cls,), {'GALAXY_NAME': cluster, 'SOURCE_NAME': source})
         )
 
     def __init__(self, galaxy_manager: galaxy.BaseGalaxyManagerSubType) -> None:
         """Constructor."""
-        galaxy_cluster_object = galaxy_manager.get_cluster(self.GALAXY_CLUSTER)
+        galaxy_object = galaxy_manager.get_galaxy(self.GALAXY_NAME)
 
         # Index all values and keep track of "original" and "unique" values
         self.entry_by_normalized_label = {}
         unique_labels = set([])
-        for entry in galaxy_cluster_object["values"]:
+        for entry in galaxy_object["values"]:
             self.entry_by_normalized_label[self.normalize(entry["value"])] = entry
             unique_labels.add(entry["value"])
 
@@ -134,7 +141,7 @@ class BaseDiscerner(AbstractDiscerner, abc.ABC):
     @property
     def galaxy(self) -> str:
         """Implement interface."""
-        return self.GALAXY_CLUSTER
+        return self.GALAXY_NAME
 
     def _discern(self, label: str, include_partial_matches: bool = False) -> Tuple[str, Dict]:
         """Do the discernment."""
@@ -159,42 +166,42 @@ class BaseDiscerner(AbstractDiscerner, abc.ABC):
 
 class MispActorDiscerner(BaseDiscerner):
 
-    GALAXY_CLUSTER = "threat-actor"
+    GALAXY_NAME = "threat-actor"
 
     SOURCE_NAME = "misp"
 
 
 class MitreActorDiscerner(BaseDiscerner):
 
-    GALAXY_CLUSTER = "mitre-intrusion-set"
+    GALAXY_NAME = "mitre-intrusion-set"
 
     SOURCE_NAME = "mitre"
 
 
 class MalpediaFamilyDiscerner(BaseDiscerner):
 
-    GALAXY_CLUSTER = "malpedia"
+    GALAXY_NAME = "malpedia"
 
     SOURCE_NAME = "malpedia"
 
 
 class MispToolDiscerner(BaseDiscerner):
 
-    GALAXY_CLUSTER = "tool"
+    GALAXY_NAME = "tool"
 
     SOURCE_NAME = "misp"
 
 
 class MitreMalwareDiscerner(BaseDiscerner):
 
-    GALAXY_CLUSTER = "mitre-malware"
+    GALAXY_NAME = "mitre-malware"
 
     SOURCE_NAME = "mitre"
 
 
 class MitreToolDiscerner(BaseDiscerner):
 
-    GALAXY_CLUSTER = "mitre-tool"
+    GALAXY_NAME = "mitre-tool"
 
     SOURCE_NAME = "mitre"
 

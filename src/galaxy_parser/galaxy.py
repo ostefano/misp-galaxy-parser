@@ -11,9 +11,10 @@ import shutil
 from tqdm.auto import tqdm
 
 from typing import Dict
-from typing import TypeVar
+from typing import Iterable
 from typing import List
 from typing import Optional
+from typing import TypeVar
 
 from galaxy_parser import exceptions
 
@@ -22,6 +23,7 @@ class BaseGalaxyManager(abc.ABC):
     """Base galaxy manager with no loading method defined."""
 
     ALL_GALAXY_NAMES = frozenset([
+        "360net",
         "android",
         "atrm",
         "attck4fraud",
@@ -91,9 +93,18 @@ class BaseGalaxyManager(abc.ABC):
                 raise exceptions.NonExistingGalaxy("Galaxy '%s' not found" % galaxy_name)
         self._galaxy_names = galaxy_names or self.ALL_GALAXY_NAMES
         self._galaxies = {}
+        self._type_to_name = {}
+        self._name_to_type = {}
         self._logger = logging.getLogger(__name__)
 
-    def get_cluster(self, galaxy_name: str) -> Dict:
+    @property
+    def galaxy_names(self) -> Iterable[str]:
+        return self._galaxies.keys()
+
+    def get_tag_prefix(self, galaxy_name: str) -> str:
+        return f"misp-galaxy:{self._name_to_type[galaxy_name]}"
+
+    def get_galaxy(self, galaxy_name: str) -> Dict:
         try:
             return self._galaxies[galaxy_name]
         except KeyError:
@@ -143,6 +154,8 @@ class GalaxyManagerMISP(BaseGalaxyManager):
                 continue
             g = misp.get_galaxy(galaxies_by_type[galaxy_name], withCluster=True, pythonify=False)
             self._galaxies[galaxy_name] = self.parse_galaxy(g)
+            self._type_to_name[self._galaxies[galaxy_name]["type"]] = galaxy_name
+            self._name_to_type[galaxy_name] = self._galaxies[galaxy_name]["type"]
 
 
 class GalaxyManagerLocal(BaseGalaxyManager):
@@ -164,6 +177,8 @@ class GalaxyManagerLocal(BaseGalaxyManager):
                 continue
             with open(galaxy_fname, "r") as f:
                 self._galaxies[galaxy_name] = self.generate_galaxy(json.load(f))
+            self._type_to_name[self._galaxies[galaxy_name]["type"]] = galaxy_name
+            self._name_to_type[galaxy_name] = self._galaxies[galaxy_name]["type"]
 
 
 class GalaxyManagerOnDemand(GalaxyManagerLocal):
