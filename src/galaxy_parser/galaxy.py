@@ -1,3 +1,5 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2
 import abc
 import collections
 import contextlib
@@ -99,12 +101,15 @@ class BaseGalaxyManager(abc.ABC):
 
     @property
     def galaxy_names(self) -> Iterable[str]:
+        """Iterate over the galaxy names."""
         return self._galaxies.keys()
 
     def get_tag_prefix(self, galaxy_name: str) -> str:
+        """Get the tag prefix of the galaxy."""
         return f"misp-galaxy:{self._name_to_type[galaxy_name]}"
 
     def get_galaxy(self, galaxy_name: str) -> Dict:
+        """Get the galaxy data."""
         try:
             return self._galaxies[galaxy_name]
         except KeyError:
@@ -165,10 +170,11 @@ class GalaxyManagerLocal(BaseGalaxyManager):
     def generate_galaxy(cls, dict_data: Dict) -> Dict:
         """Add a tag field to a galaxy dictionary."""
         for cluster in dict_data["values"]:
-            cluster["tag_name"] = f"mitre-galaxy:{dict_data['type']}=\"{cluster['value']}\""
+            cluster["tag_name"] = f"misp-galaxy:{dict_data['type']}=\"{cluster['value']}\""
         return dict_data
 
     def __init__(self, input_directory: str, galaxy_names: Optional[List[str]] = None):
+        """Constructor."""
         super(GalaxyManagerLocal, self).__init__(galaxy_names)
         for galaxy_name in self._galaxy_names:
             galaxy_fname = os.path.join(input_directory, f"{galaxy_name}.json")
@@ -220,10 +226,10 @@ class GalaxyManagerOnDemand(GalaxyManagerLocal):
         """Constructor."""
         for galaxy_name in galaxy_names:
             self.download(
-                f"{self.GH_CLUSTERS_URL}{galaxy_name}.json",
-                os.path.join(cache_directory, f"{galaxy_name}.json"),
-                verbose,
-                force,
+                url=f"{self.GH_CLUSTERS_URL}{galaxy_name}.json",
+                output_file_path=os.path.join(cache_directory, f"{galaxy_name}.json"),
+                verbose=verbose,
+                force=force,
             )
         super(GalaxyManagerOnDemand, self).__init__(cache_directory, galaxy_names)
 

@@ -1,3 +1,5 @@
+# Copyright 2022 VMware, Inc.
+# SPDX-License-Identifier: BSD-2
 from galaxy_parser import discerner
 from galaxy_parser import exceptions
 from galaxy_parser import galaxy
