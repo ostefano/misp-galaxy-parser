@@ -3,8 +3,9 @@ from galaxy_parser import exceptions
 from galaxy_parser import galaxy
 from typing import Any
 from typing import Dict
-from typing import List
 from typing import Iterable
+from typing import List
+from typing import Optional
 
 
 def get_discerners(
@@ -22,7 +23,8 @@ def get_discerners(
 def get_discerned_tags(
     discerners: Iterable[discerner.BaseDiscernerSubType],
     string: str,
-    include_partial_matches: bool = False,
+    include_partial_matches: bool = True,
+    hint: Optional[str] = None,
 ) -> List[str]:
     """Get a list of tags from the loaded discerners."""
     labels = []
@@ -30,7 +32,7 @@ def get_discerned_tags(
         return labels
     for d in discerners:
         try:
-            discernment = d.discern(string, include_partial_matches)
+            discernment = d.discern(string, include_partial_matches, hint)
             labels.append(discernment.get_tag())
         except exceptions.FailedDiscernment:
             continue

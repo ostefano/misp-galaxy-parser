@@ -1,9 +1,10 @@
 import abc
 import dataclasses
+import difflib
+import re
 
 from typing import cast
 from typing import Dict
-from typing import Tuple
 from typing import List
 from typing import Type
 from typing import TypeVar
@@ -22,7 +23,7 @@ class Discernment:
     galaxy: str
     raw_data: Dict
 
-    def get_tag(self):
+    def get_tag(self) -> str:
         return f"misp-galaxy:{self.galaxy}=\"{self.discerned_name}\""
 
 
@@ -39,9 +40,11 @@ class AbstractDiscerner(abc.ABC):
         "backdoor",
     ])
 
+    SEPARATORS = ", "
+
     @staticmethod
     def normalize(label: str) -> str:
-        """Normalize a label removing spaces and converting to lower case."""
+        """Normalize a label removing spaces and converting it to lower case."""
         return label.strip().lower().replace(" ", "").replace("-", "").replace("_", "")
 
     @property
@@ -54,13 +57,36 @@ class AbstractDiscerner(abc.ABC):
     def galaxy(self) -> str:
         """Return the galaxy of this discernment."""
 
+    @classmethod
+    def _partial_match(cls, query_string: str, dataset_string: str) -> bool:
+        """Return whether something should be considered a partial match."""
+        return dataset_string.startswith(query_string)
+
     @abc.abstractmethod
-    def _discern(self, label: str, include_partial_matches: bool = False) -> Tuple[str, Dict]:
+    def _discern(self, label: str, include_partial_matches: bool = False) -> Dict[str, Dict]:
         """Do the discernment."""
 
-    def discern(self, label: str, include_partial_matches: bool = False) -> Discernment:
+    def discern(
+        self,
+        label: str,
+        include_partial_matches: bool = False,
+        hint: Optional[str] = None,
+    ) -> Discernment:
         """Do the discernment."""
-        discerned_name, raw_data = self._discern(label, include_partial_matches)
+        discernments = self._discern(label, include_partial_matches)
+        # sometimes we can get multiple discernments, so use the hint to select which one
+        if len(discernments) > 1 and hint:
+            normalized_hint = self.normalize(hint)
+            # build a dictionary where keys are labels and values how similar they are to the hint
+            scores = {
+                k: difflib.SequenceMatcher(None, self.normalize(k), normalized_hint).ratio()
+                for k in discernments.keys()
+            }
+            # pick as label the one which is most similar to the hint once normalized
+            discerned_name = max(scores, key=scores.get)
+            raw_data = discernments[discerned_name]
+        else:
+            discerned_name, raw_data = list(discernments.items())[0]
         return Discernment(
             label=label,
             discerned_name=discerned_name,
@@ -73,15 +99,16 @@ class AbstractDiscerner(abc.ABC):
         self,
         label: str,
         include_partial_matches: bool = False,
-        separators: str = None
+        separators: Optional[str] = None,
+        hint: Optional[str] = None,
     ) -> List[Discernment]:
         """Decompose a label (useful with compound words), and then discern."""
         if not separators:
-            separators = " ,"
+            separators = self.SEPARATORS
         ret = []
         for label_fragment in label.split(separators):
             try:
-                discernment = self.discern(label_fragment, include_partial_matches)
+                discernment = self.discern(label_fragment, include_partial_matches, hint)
                 ret.append(discernment)
             except exceptions.FailedDiscernment:
                 continue
@@ -107,7 +134,7 @@ class BaseDiscerner(AbstractDiscerner, abc.ABC):
         class_name = f"DiscernerClass_{cluster}_{source}"
         return cast(
             Type[galaxy.BaseGalaxyManagerSubType],
-            type(class_name, (cls,), {'GALAXY_NAME': cluster, 'SOURCE_NAME': source})
+            type(class_name, (cls,), {"GALAXY_NAME": cluster, "SOURCE_NAME": source})
         )
 
     def __init__(self, galaxy_manager: galaxy.BaseGalaxyManagerSubType) -> None:
@@ -120,6 +147,10 @@ class BaseDiscerner(AbstractDiscerner, abc.ABC):
         for entry in galaxy_object["values"]:
             self.entry_by_normalized_label[self.normalize(entry["value"])] = entry
             unique_labels.add(entry["value"])
+            # Malpedia Fix:
+            #   if we have 'BlackMatter (Windows)' also add 'BlackMatter' so when we look
+            #   for synonyms of DarkSide, we do not add new entry for 'BlackMatter'
+            unique_labels.add(re.sub(r"[\(\[].*?[\)\]]", "", entry["value"]).strip(" "))
 
         # Analyze all data entries and get the synonyms from the "meta" structure which are new
         entry_by_normalized_label_synonym = {}
@@ -143,24 +174,32 @@ class BaseDiscerner(AbstractDiscerner, abc.ABC):
         """Implement interface."""
         return self.GALAXY_NAME
 
-    def _discern(self, label: str, include_partial_matches: bool = False) -> Tuple[str, Dict]:
+    def _discern(self, label: str, include_partial_matches: bool = False) -> Dict[str, Dict]:
         """Do the discernment."""
         normalized_label = self.normalize(label)
         if normalized_label in self.BLACKLIST:
             raise exceptions.FailedDiscernment
         try:
-            return (
-                self.entry_by_normalized_label[normalized_label]["value"],
-                self.entry_by_normalized_label[normalized_label]
-            )
+            # after normalizing we try to get a precise match
+            return {
+                self.entry_by_normalized_label[normalized_label]["value"]:
+                    self.entry_by_normalized_label[normalized_label]
+            }
         except KeyError:
+            # if we fail we start considering whether using a partial would give us a result
             if include_partial_matches:
+                ret = {}
                 for unique_normalized_label in self.unique_normalized_labels:
-                    if normalized_label in unique_normalized_label:
-                        return (
-                            self.entry_by_normalized_label[unique_normalized_label]["value"],
+                    # a partial match is partial in two ways:
+                    #   1) because the label we are looking can match only one word
+                    #   2) because the match is not really exact
+                    if self._partial_match(normalized_label, unique_normalized_label):
+                        ret[self.entry_by_normalized_label[unique_normalized_label]["value"]] = (
                             self.entry_by_normalized_label[unique_normalized_label]
                         )
+                # partial matches are partial so there can be more than one
+                if ret:
+                    return ret
             raise exceptions.FailedDiscernment
 
 

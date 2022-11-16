@@ -39,11 +39,18 @@ def main():
     )
     parser.add_argument(
         "-m",
-        "--compound",
-        dest="compound",
+        "--include_partial_matches",
+        dest="include_partial_matches",
         default=False,
         action="store_true",
-        help="whether the queried is for a compound label",
+        help="whether the query should allow partial matches",
+    )
+    parser.add_argument(
+        "-i",
+        "--hint",
+        dest="hint",
+        default=None,
+        help="specify a hint",
     )
     parser.add_argument(
         "-v",
@@ -74,7 +81,11 @@ def main():
     labels = []
     for d in discerners:
         try:
-            discernment = d.discern(args.query, args.compound)
+            discernment = d.discern(
+                args.query,
+                include_partial_matches=args.include_partial_matches,
+                hint=args.hint,
+            )
             labels.append(discernment.get_tag())
         except exceptions.FailedDiscernment:
             pass
