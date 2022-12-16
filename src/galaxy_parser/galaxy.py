@@ -190,7 +190,9 @@ class GalaxyManagerLocal(BaseGalaxyManager):
 class GalaxyManagerOnDemand(GalaxyManagerLocal):
     """A local galaxy manager that download clusters on demand."""
 
-    GH_CLUSTERS_URL = "https://raw.githubusercontent.com/MISP/misp-galaxy/main/clusters/"
+    GH_CLUSTERS_URL = "https://raw.githubusercontent.com/MISP/misp-galaxy/{reference}/clusters/"
+
+    GH_MAIN_BRANCH = "main"
 
     @classmethod
     def download(
@@ -221,13 +223,17 @@ class GalaxyManagerOnDemand(GalaxyManagerLocal):
         cache_directory: str,
         galaxy_names: List[str] = None,
         verbose: bool = False,
+        commit_hash: Optional[str] = None,
         force: bool = False,
     ):
         """Constructor."""
+        reference = commit_hash or self.GH_MAIN_BRANCH
+        extension = f"{commit_hash[:7]}.json" if commit_hash else "json"
+        galaxy_url = self.GH_CLUSTERS_URL.format(reference=reference)
         for galaxy_name in galaxy_names:
             self.download(
-                url=f"{self.GH_CLUSTERS_URL}{galaxy_name}.json",
-                output_file_path=os.path.join(cache_directory, f"{galaxy_name}.json"),
+                url=f"{galaxy_url}{galaxy_name}.json",
+                output_file_path=os.path.join(cache_directory, f"{galaxy_name}.{extension}"),
                 verbose=verbose,
                 force=force,
             )
