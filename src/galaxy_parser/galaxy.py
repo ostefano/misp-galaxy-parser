@@ -173,11 +173,17 @@ class GalaxyManagerLocal(BaseGalaxyManager):
             cluster["tag_name"] = f"misp-galaxy:{dict_data['type']}=\"{cluster['value']}\""
         return dict_data
 
-    def __init__(self, input_directory: str, galaxy_names: Optional[List[str]] = None):
+    def __init__(
+        self,
+        input_directory: str,
+        galaxy_names: Optional[List[str]] = None,
+        commit_hash: Optional[str] = None,
+    ):
         """Constructor."""
         super(GalaxyManagerLocal, self).__init__(galaxy_names)
+        extension = f"{commit_hash[:7]}.json" if commit_hash else "json"
         for galaxy_name in self._galaxy_names:
-            galaxy_fname = os.path.join(input_directory, f"{galaxy_name}.json")
+            galaxy_fname = os.path.join(input_directory, f"{galaxy_name}.{extension}")
             if not os.path.exists(galaxy_fname):
                 print(f"Galaxy {galaxy_name} missing...")
                 continue
@@ -222,8 +228,8 @@ class GalaxyManagerOnDemand(GalaxyManagerLocal):
         self,
         cache_directory: str,
         galaxy_names: List[str] = None,
-        verbose: bool = False,
         commit_hash: Optional[str] = None,
+        verbose: bool = False,
         force: bool = False,
     ):
         """Constructor."""
@@ -237,7 +243,7 @@ class GalaxyManagerOnDemand(GalaxyManagerLocal):
                 verbose=verbose,
                 force=force,
             )
-        super(GalaxyManagerOnDemand, self).__init__(cache_directory, galaxy_names)
+        super(GalaxyManagerOnDemand, self).__init__(cache_directory, galaxy_names, commit_hash)
 
 
 BaseGalaxyManagerSubType = TypeVar("BaseGalaxyManagerSubType", bound=BaseGalaxyManager)
