@@ -1,3 +1,5 @@
+***The repository has been migrated to `vmware-labs`: https://github.com/vmware-labs/galaxy-parser-for-misp***
+
 # MISP Galaxy Parser
 
 Utilities to parse galaxy clusters and resolve labels (including synonyms).
